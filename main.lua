@@ -49,10 +49,10 @@ function createScreen(rootEl)
 
     function res:draw()
         term.clear()
-        self.root:setX(1)
-        self.root:setY(1)
-        self.root:setWidth(w)
-        self.root:setHeight(h)
+        self.root:setX(2)
+        self.root:setY(2)
+        self.root:setWidth(w - 2)
+        self.root:setHeight(h - 2)
         self.root:draw()
     end
 
@@ -134,10 +134,11 @@ function createContainerElement(id)
     return res
 end
 
-function createLinearLayout(id, horizontal)
+function createLinearLayout(id, horizontal, gap)
     local res = createContainerElement(id)
 
     res.horizontal = horizontal or false
+    res.gap = gap or 0
 
     function res:draw()
         local x = self:getX()
@@ -147,21 +148,23 @@ function createLinearLayout(id, horizontal)
 
         if self.horizontal then
             -- Horizontal
+            w = w - (#self:getChildren() - 1) * self.gap
             for i, child in ipairs(self:getChildren()) do
                 child:setX(x)
                 child:setY(y)
                 child:setHeight(h)
                 child:draw()
-                x = x + child:getWidth()
+                x = x + child:getWidth() + self.gap
             end
         else
             -- Vertical
+            h = h - (#self:getChildren() - 1) * self.gap
             for i, child in ipairs(self:getChildren()) do
                 child:setX(x)
                 child:setY(y)
                 child:setWidth(w)
                 child:draw()
-                y = y + child:getHeight()
+                y = y + child:getHeight() + self.gap
             end
         end
     end
@@ -240,9 +243,11 @@ function createFrameLayout(id, title, borderColor, child)
     return res
 end
 
-function createSplitLayout(id, vertical)
+function createSplitLayout(id, vertical, gap)
     local res = createContainerElement(id)
+
     res.vertical = vertical or false
+    res.gap = gap or 0
 
     function res:draw()
         -- Compute total weight
@@ -259,6 +264,7 @@ function createSplitLayout(id, vertical)
         local h = self:getHeight()
         if self.vertical then
             -- Vertical
+            h = h - (#self:getChildren() - 1) * self.gap
             local extra = h % total_weight
             for i, child in ipairs(self:getChildren()) do
                 local height = math.floor(h * child:getLayoutWeight() / total_weight)
@@ -273,10 +279,11 @@ function createSplitLayout(id, vertical)
                 child:setWidth(w)
                 child:setHeight(height)
                 child:draw()
-                y = y + height
+                y = y + height + self.gap
             end
         else
             -- Horizontal
+            w = w - (#self:getChildren() - 1) * self.gap
             local extra = w % total_weight
             for i, child in ipairs(self:getChildren()) do
                 local width = math.floor(w * child:getLayoutWeight() / total_weight)
@@ -291,7 +298,7 @@ function createSplitLayout(id, vertical)
                 child:setWidth(width)
                 child:setHeight(h)
                 child:draw()
-                x = x + width
+                x = x + width + self.gap
             end
         end
     end
@@ -416,7 +423,7 @@ sectionEnergy:addChild(createProgressBar("energyProgressEnergy", 1, colors.green
 sectionEnergy:addChild(createSpace())
 sectionEnergy:addChild(createLabel("energyLabelIO", "+1000 FE/t", "center", 1, colors.blue))
 
-local left = createSplitLayout("left", true)
+local left = createSplitLayout("left", true, 1)
 left:addChild(sectionReactor)
 left:addChild(sectionBoiler)
 left:addChild(sectionTurbine)
@@ -424,7 +431,7 @@ left:addChild(sectionTurbine)
 local right = createSplitLayout("right", true)
 right:addChild(sectionEnergy)
 
-local root = createSplitLayout("root")
+local root = createSplitLayout("root", false, 1)
 root:addChild(left)
 root:addChild(right)
 
