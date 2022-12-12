@@ -1,3 +1,12 @@
+local mon = peripheral.wrap("top")
+term.redirect(mon)
+
+local modem = peripheral.wrap("bottom")
+modem.open(0)
+modem.open(1)
+modem.open(2)
+modem.open(3)
+
 -- Utils
 function box_chars(fg, bg)
     return {
@@ -99,7 +108,6 @@ function createBaseElement(id)
     end
 
     function res:findChild(id)
-        print("checking element " .. self:getId())
         if id == self:getId() then
             return self
         else
@@ -371,10 +379,10 @@ function createProgressBar(id, height, fg, bg)
             term.setCursorPos(self:getX(), self:getY() + i - 1)
 
             term.setBackgroundColor(self:getForeground())
-            twrite(string.format("%-" .. leftSize .. "s", " "))
+            if leftSize > 0 then twrite(string.format("%-" .. leftSize .. "s", " ")) end
 
             term.setBackgroundColor(self:getBackground())
-            twrite(string.format("%-" .. rightSize .. "s", " "))
+            if rightSize > 0 then twrite(string.format("%-" .. rightSize .. "s", " ")) end
         end
     end
 
@@ -402,6 +410,8 @@ sectionReactor:addChild(createProgressBar("reactorProgressFuel", 1, colors.purpl
 sectionReactor:addChild(createSpace())
 sectionReactor:addChild(createLabel(nil, "Waste"))
 sectionReactor:addChild(createProgressBar("reactorProgressWaste", 1, colors.brown))
+sectionReactor:addChild(createSpace())
+sectionReactor:addChild(createLabel("reactorLabelBurnRate", "Burn Rate: 0 mb/t"))
 
 local sectionBoiler = createFrameLayout(nil, "Thermoelectric Boiler", colors.brown)
 sectionBoiler:addChild(createLabel(nil, "Input Coolant"))
@@ -416,10 +426,13 @@ sectionTurbine:addChild(createProgressBar("turbineProgressSteam", 1, colors.ligh
 sectionTurbine:addChild(createSpace())
 sectionTurbine:addChild(createLabel(nil, "Energy Buffer"))
 sectionTurbine:addChild(createProgressBar("turbineProgressEnergy", 1, colors.green))
+sectionTurbine:addChild(createSpace())
+sectionTurbine:addChild(createLabel("turbineLabelProduction", "Production: 0 FE/t"))
 
 local sectionEnergy = createFrameLayout(nil, "Base Energy Storage", colors.green)
 sectionEnergy:addChild(createLabel(nil, "Energy Buffer"))
 sectionEnergy:addChild(createProgressBar("energyProgressEnergy", 1, colors.green))
+sectionEnergy:addChild(createLabel("energyLabelEnergy", "0 / 0", "right"))
 sectionEnergy:addChild(createSpace())
 sectionEnergy:addChild(createLabel("energyLabelIO", "+1000 FE/t", "center", 1, colors.blue))
 
@@ -436,4 +449,55 @@ root:addChild(left)
 root:addChild(right)
 
 local screen = createScreen(root)
-screen:infiniteDraw(1)
+
+while true do
+    local event, modemSide, senderChannel, replyChannel, message = os.pullEvent("modem_message")
+
+    if message.provider == "fission_reactor_0" then
+        local fuel = root:findChild("reactorProgressFuel")
+        fuel:setValue(message.fuel)
+        fuel:setMax(message.fuelMax)
+
+        local coolant = root:findChild("reactorProgressCoolant")
+        coolant:setValue(message.coolant)
+        coolant:setMax(message.coolantMax)
+
+        local waste = root:findChild("reactorProgressWaste")
+        waste:setValue(message.waste)
+        waste:setMax(message.wasteMax)
+
+        local burnRate = root:findChild("reactorLabelBurnRate")
+        burnRate:setText("Burn Rate: " .. message.burnRate .. " mb/t")
+    elseif message.provider == "boiler_0" then
+        local input = root:findChild("boilerProgressInput")
+        input:setValue(message.heated)
+        input:setMax(message.heatedMax)
+
+        local output = root:findChild("boilerProgressOutput")
+        output:setValue(message.cooled)
+        output:setMax(message.cooledMax)
+    elseif message.provider == "turbine_0" then
+        local steam = root:findChild("turbineProgressSteam")
+        steam:setValue(message.steam)
+        steam:setMax(message.steamMax)
+
+        local energy = root:findChild("turbineProgressEnergy")
+        energy:setValue(message.energy)
+        energy:setMax(message.energyMax)
+
+        local production = root:findChild("turbineLabelProduction")
+        production:setText("Production: " .. math.floor(message.production / 1000) / 1000 .. " MFE/t")
+    elseif message.provider == "base_energy_storage" then
+        local energy = root:findChild("energyProgressEnergy")
+        energy:setValue(message.energy)
+        energy:setMax(message.energyMax)
+
+        local energyLabel = root:findChild("energyLabelEnergy")
+        energyLabel:setText(math.floor(message.energy / 1000) .. "/" .. math.floor(message.energyMax / 1000) .. " kFE")
+
+        local rateLabel = root:findChild("energyLabelIO")
+        rateLabel:setText(math.floor(message.rate) .. " FE/t")
+    end
+
+    screen:draw()
+end
